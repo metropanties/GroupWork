@@ -1,9 +1,9 @@
 package me.metropanties.groupwork.security.filters;
 
-import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.exceptions.SignatureVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import lombok.RequiredArgsConstructor;
+import me.metropanties.groupwork.service.JWTService;
 import me.metropanties.groupwork.util.MapperUtils;
 import me.metropanties.groupwork.util.JWTUtils;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthorizationFilter extends OncePerRequestFilter {
 
-    private final JWTVerifier verifier;
+    private final JWTService jwtService;
 
     @Override
     protected void doFilterInternal(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filter) throws ServletException, IOException {
@@ -39,7 +39,10 @@ public class AuthorizationFilter extends OncePerRequestFilter {
             String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
             String token = JWTUtils.getAuthorizationToken(authorizationHeader);
             try {
-                DecodedJWT decodedJWT = verifier.verify(token);
+                DecodedJWT decodedJWT = jwtService.decode(token);
+                if (decodedJWT == null)
+                    return;
+
                 String username = decodedJWT.getSubject();
                 String[] roles = decodedJWT.getClaim("roles").asArray(String.class);
                 List<SimpleGrantedAuthority> authorities = Arrays.stream(roles).map(SimpleGrantedAuthority::new).toList();

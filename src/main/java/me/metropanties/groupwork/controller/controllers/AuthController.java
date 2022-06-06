@@ -7,10 +7,12 @@ import me.metropanties.groupwork.exception.UsernameAlreadyExists;
 import me.metropanties.groupwork.object.AuthCredentials;
 import me.metropanties.groupwork.object.RegistryObject;
 import me.metropanties.groupwork.object.TokenRefreshRequest;
+import me.metropanties.groupwork.service.JWTService;
 import me.metropanties.groupwork.service.UserService;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -22,6 +24,7 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    private final JWTService jwtService;
 
     @PostMapping("/register")
     public ResponseEntity<Object> register(@RequestBody @NotNull RegistryObject registry) {
@@ -46,12 +49,32 @@ public class AuthController {
 
     }
 
-    /*
-     * TODO: Handling of refresh tokens.
-     */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/refresh")
-    public ResponseEntity<Object> refreshToken(@NotNull TokenRefreshRequest request) {
-        return null;
+    public ResponseEntity<Object> refreshToken(@RequestBody TokenRefreshRequest request) {
+        String refreshToken = request.refreshToken();
+        if (refreshToken == null) {
+            Map<String, Object> body = Map.of(
+                    "message", "Please provide a valid refresh token!",
+                    "code", HttpStatus.BAD_REQUEST.value()
+            );
+            return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        }
+
+        String accessToken = jwtService.refresh(refreshToken);
+        if (accessToken == null) {
+            Map<String, Object> body = Map.of(
+                    "message", "An error occurred, try again.",
+                    "code", HttpStatus.BAD_REQUEST.value()
+            );
+            return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        }
+
+        Map<String, Object> body = Map.of(
+                "access_token", accessToken,
+                "code", HttpStatus.OK.value()
+        );
+        return new ResponseEntity<>(body, HttpStatus.OK);
     }
 
 }

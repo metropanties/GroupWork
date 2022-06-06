@@ -1,27 +1,28 @@
 package me.metropanties.groupwork.security.filters;
 
 import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
 import lombok.RequiredArgsConstructor;
 import me.metropanties.groupwork.entity.User;
+import me.metropanties.groupwork.security.jwt.JWTConstants;
+import me.metropanties.groupwork.service.JWTService;
 import me.metropanties.groupwork.util.MapperUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class AuthenticationFilter extends UsernamePasswordAuthenticationFilter {
@@ -29,7 +30,7 @@ public class AuthenticationFilter extends UsernamePasswordAuthenticationFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationFilter.class);
 
     private final AuthenticationManager authenticationManager;
-    private final Algorithm algorithm;
+    private final JWTService jwtService;
 
     @Override
     public Authentication attemptAuthentication(@NotNull HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
@@ -54,14 +55,22 @@ public class AuthenticationFilter extends UsernamePasswordAuthenticationFilter {
             return;
         }
 
-        String accessToken = JWT.create()
+        String accessToken = jwtService.create(JWT.create()
                 .withIssuer(request.getRequestURL().toString())
+                .withExpiresAt(new Date(System.currentTimeMillis() + JWTConstants.ACCESS_TOKEN_EXPIRE))
                 .withSubject(user.getUsername())
                 .withClaim("roles", user.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
-                .sign(algorithm);
+        );
+        String refreshToken = jwtService.create(JWT.create()
+                .withIssuer(request.getRequestURL().toString())
+                .withExpiresAt(new Date(System.currentTimeMillis() + JWTConstants.REFRESH_TOKEN_EXPIRE))
+                .withSubject(user.getUsername())
+        );
 
+        response.setStatus(HttpStatus.OK.value());
         MapperUtils.write(response, Map.of(
-                "access_token", accessToken
+                "access_token", accessToken,
+                "refresh_token", refreshToken
         ));
     }
 
